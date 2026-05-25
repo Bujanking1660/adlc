@@ -30,6 +30,8 @@ interface HistoryItem {
   schemaFileName?: string | null;
   hasBackend: boolean;
   createdAt: string;
+  readme?: string | null;
+  boilerplate?: string | null;
 }
 
 type AgentKey = 'analyst' | 'frontend' | 'backend' | 'qa';
@@ -80,6 +82,8 @@ export default function Workspace({
   const [finalSchema, setFinalSchema] = useState<string | null>(null);
   const [schemaFileName, setSchemaFileName] = useState<string | null>(null);
   const [hasBackend, setHasBackend] = useState(false);
+  const [finalReadme, setFinalReadme] = useState<string | null>(null);
+  const [finalBoilerplate, setFinalBoilerplate] = useState<string | null>(null);
   const [hasStarted, setHasStarted] = useState(false);
   const [projectId, setProjectId] = useState<string | null>(null);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
@@ -109,6 +113,8 @@ export default function Workspace({
     setFinalSchema(null);
     setSchemaFileName(null);
     setHasBackend(false);
+    setFinalReadme(null);
+    setFinalBoilerplate(null);
     setProjectId(null);
     setHasStarted(false);
     setCurrentAgentIndex(0);
@@ -134,6 +140,8 @@ export default function Workspace({
                 schemaFileName: finalPlanObj.schemaFileName || null,
                 hasBackend: !!finalPlanObj.hasBackend,
                 createdAt: proj.created_at,
+                readme: finalPlanObj.readme || null,
+                boilerplate: finalPlanObj.boilerplate || null,
               };
             });
             setHistory(mappedHistory);
@@ -379,6 +387,8 @@ export default function Workspace({
     setFinalSchema(item.schema ?? null);
     setSchemaFileName(item.schemaFileName ?? null);
     setHasBackend(item.hasBackend);
+    setFinalReadme(item.readme ?? null);
+    setFinalBoilerplate(item.boilerplate ?? null);
     setProjectId(item.id);
     setHasStarted(true);
     setSteps(makeInitialSteps().map(s => ({ ...s, status: 'completed' })));
@@ -386,12 +396,16 @@ export default function Workspace({
   }, []);
 
   // Save edited plan
-  const handleSavePlan = useCallback(async (newContent: string, tab: 'plan' | 'schema') => {
+  const handleSavePlan = useCallback(async (newContent: string, tab: 'plan' | 'schema' | 'readme' | 'boilerplate') => {
     const nextPlan = tab === 'plan' ? newContent : finalPlan;
     const nextSchema = tab === 'schema' ? newContent : finalSchema;
+    const nextReadme = tab === 'readme' ? newContent : finalReadme;
+    const nextBoilerplate = tab === 'boilerplate' ? newContent : finalBoilerplate;
 
     if (tab === 'plan') setFinalPlan(newContent);
-    else setFinalSchema(newContent);
+    else if (tab === 'schema') setFinalSchema(newContent);
+    else if (tab === 'readme') setFinalReadme(newContent);
+    else if (tab === 'boilerplate') setFinalBoilerplate(newContent);
 
     if (user?.id && projectId) {
       try {
@@ -405,6 +419,8 @@ export default function Workspace({
               schema: nextSchema,
               schemaFileName,
               hasBackend,
+              readme: nextReadme,
+              boilerplate: nextBoilerplate,
             },
           }),
         });
@@ -422,17 +438,22 @@ export default function Workspace({
     }
 
     showToast('Perubahan berhasil disimpan.', 'success');
-    if (finalPlan) {
-      setHistory(prev => {
-        const idx = prev.findIndex(h => h.plan === finalPlan);
-        if (idx === -1) return prev;
-        const updated = [...prev];
-        updated[idx] = { ...updated[idx], [tab === 'plan' ? 'plan' : 'schema']: newContent };
-        localStorage.setItem(LS_HISTORY, JSON.stringify(updated));
-        return updated;
-      });
-    }
-  }, [finalPlan, finalSchema, schemaFileName, hasBackend, user, projectId, loadHistory, showToast]);
+    
+    setHistory(prev => {
+      const idx = prev.findIndex(h => h.id === projectId || h.plan === finalPlan);
+      if (idx === -1) return prev;
+      const updated = [...prev];
+      updated[idx] = { 
+        ...updated[idx], 
+        plan: nextPlan || '',
+        schema: nextSchema,
+        readme: nextReadme,
+        boilerplate: nextBoilerplate,
+      };
+      localStorage.setItem(LS_HISTORY, JSON.stringify(updated));
+      return updated;
+    });
+  }, [finalPlan, finalSchema, finalReadme, finalBoilerplate, schemaFileName, hasBackend, user, projectId, loadHistory, showToast]);
 
 
   // Handle persona step click — toggle focus
@@ -664,10 +685,10 @@ export default function Workspace({
 
           ) : (
             /* ─── Active Workspace ──────────────────────────────────── */
-            <div className="w-full max-w-6xl mx-auto flex flex-col md:flex-row p-4 md:p-8 gap-6 md:gap-8 animate-fadeSlideUp">
+            <div className="w-full max-w-[1550px] mx-auto flex flex-col lg:flex-row p-4 md:p-8 gap-6 md:gap-8 animate-fadeSlideUp">
 
               {/* Left column: brief + agent progress */}
-              <div className="w-full md:w-[340px] flex-shrink-0 flex flex-col gap-5">
+              <div className="w-full lg:w-[340px] flex-shrink-0 flex flex-col gap-5">
                 {/* Interactive Project Brief Update Panel */}
                 <div
                   className="rounded-2xl p-5 shadow-lg border"
@@ -747,7 +768,7 @@ export default function Workspace({
 
               {/* Right column: plan canvas */}
               <div
-                className="flex-grow min-h-[500px] md:min-h-[600px] rounded-3xl border p-0 md:p-6 relative md:shadow-lg"
+                className="flex-grow min-h-[550px] lg:min-h-[650px] rounded-3xl border p-0 overflow-hidden relative md:shadow-2xl flex flex-col"
                 style={{ background: 'var(--panel-bg)', borderColor: 'var(--panel-border)' }}
               >
                 {finalPlan ? (
@@ -758,6 +779,10 @@ export default function Workspace({
                     hasBackend={hasBackend}
                     projectTitle="Pluto Project Plan"
                     onSave={handleSavePlan}
+                    readme={finalReadme}
+                    boilerplate={finalBoilerplate}
+                    projectId={projectId}
+                    originalPrompt={prompt || updatePrompt}
                   />
                 ) : (
                   <div className="w-full h-full flex flex-col items-center justify-center p-8" style={{ color: 'var(--text-muted)' }}>

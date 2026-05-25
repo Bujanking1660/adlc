@@ -276,6 +276,69 @@ export async function POST(req: Request) {
       });
     }
 
+    // ==========================================
+    // EXTRA STEP: GITHUB README AGENT
+    // ==========================================
+    if (currentStep === 'readme') {
+      await logAgentAction(projectId, 'GitHub README Agent', 'processing');
+      
+      const readmePrompt = `
+      You are an Expert Technical Writer and DevOps Agent for Pluto.
+      Your task is to generate a professional, production-ready, beautiful GitHub README.md file for the application based on its development plan.
+      
+      Original Project Scope: "${prompt}"
+      Full Development Plan:
+      "${previousContext?.plan || ''}"
+      
+      The README should contain:
+      1. A modern, eye-catching header with project title and a catchy subtitle.
+      2. Feature overview with clean bullet points.
+      3. Technology stack section with short descriptions of why they were chosen.
+      4. Prerequisites and step-by-step Installation guide (using standard packages like npm/yarn).
+      5. Basic configuration instructions (like .env file settings).
+      6. Folder structure diagram/tree.
+      7. Contribution guidelines and license.
+      
+      Structure the output as clean markdown. Do NOT wrap the entire response in markdown code blocks, just return the raw markdown content itself.
+      `;
+
+      const result = await model.generateContent(readmePrompt);
+      const text = result.response.text().trim();
+      
+      await logAgentAction(projectId, 'GitHub README Agent', 'completed');
+      return NextResponse.json({ status: 'completed', output: text });
+    }
+
+    // ==========================================
+    // EXTRA STEP: BOILERPLATE INITIALIZER AGENT
+    // ==========================================
+    if (currentStep === 'boilerplate') {
+      await logAgentAction(projectId, 'Boilerplate Setup Agent', 'processing');
+      
+      const boilerplatePrompt = `
+      You are an Expert DevOps and Automation Engineer for Pluto.
+      Your task is to generate a comprehensive bash shell script (setup.sh) that will initialize the directory structure, create configuration files, and install dependencies for this application.
+      
+      Original Project Scope: "${prompt}"
+      Full Development Plan:
+      "${previousContext?.plan || ''}"
+      
+      The bash script should:
+      1. Create all directory paths outlined in the plan (e.g. using mkdir -p).
+      2. Initialize a standard package.json file or setup dependencies (e.g. npm init -y, install frameworks if applicable).
+      3. Generate empty baseline files (e.g. using touch or echo to write empty files) like .env.example, README.md, components, routes, libraries.
+      4. Be clean, safe to run, and contain comments explaining what each section does.
+      
+      Structure the output as a clean shell script. Do NOT wrap the entire response in markdown code blocks, just return the raw bash script itself.
+      `;
+
+      const result = await model.generateContent(boilerplatePrompt);
+      const text = result.response.text().trim();
+      
+      await logAgentAction(projectId, 'Boilerplate Setup Agent', 'completed');
+      return NextResponse.json({ status: 'completed', output: text });
+    }
+
     return NextResponse.json({ error: 'Invalid agentStep' }, { status: 400 });
 
   } catch (error: any) {
