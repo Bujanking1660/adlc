@@ -1,0 +1,32 @@
+# ---- Dependency & build artifacts ----
+node_modules
+.next
+
+# ---- Git & IDE ----
+.git
+.gitignore
+.github
+
+# ---- Environment & secrets (JANGAN masuk image!) ----
+.env
+.env.local
+.env*.local
+
+# ---- Development & docs ----
+README.md
+*.md
+*.txt
+
+# ---- OS & misc ----
+.DS_Store
+Thumbs.db
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# ---- TypeScript cache ----
+*.tsbuildinfo
+
+# ---- Test & coverage ----
+coverage
+test-*.mjs
