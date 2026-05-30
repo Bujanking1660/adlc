@@ -27,10 +27,13 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
 # Env vars yang dibutuhkan saat BUILD (bukan runtime secret)
-# NEXT_PUBLIC_* harus di-embed saat build karena diakses di client-side.
-# Sisanya (Gemini key, Supabase service key) cukup di-inject saat runtime.
+# NEXT_PUBLIC_* harus di-embed saat build karena diakses di client-side browser.
+# Keduanya WAJIB di-pass via --build-arg, tanpanya Supabase client = null!
 ARG NEXT_PUBLIC_SUPABASE_URL
 ENV NEXT_PUBLIC_SUPABASE_URL=$NEXT_PUBLIC_SUPABASE_URL
+
+ARG NEXT_PUBLIC_SUPABASE_ANON_KEY
+ENV NEXT_PUBLIC_SUPABASE_ANON_KEY=$NEXT_PUBLIC_SUPABASE_ANON_KEY
 
 # Nonaktifkan telemetri Next.js
 ENV NEXT_TELEMETRY_DISABLED=1

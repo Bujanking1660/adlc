@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "NEXT_PUBLIC_SUPABASE_URL=https://hxduokuuhrcrxcbrznlq.supabase.co NEXT_PUBLIC_SUPABASE_ANON_KEY=sb_publishable_J0SBZPsS0lQPHILUXT_0jA_HqOanUm2 SUPABASE_SERVICE_KEY=sb_secret_XDqUQjBP4CD6EbAmuOW6lw_iyrQb3b2 next build",
+    "build": "next build",
     "start": "next start",
     "lint": "eslint"
   },
