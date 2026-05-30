@@ -17,6 +17,8 @@ import { createClientBrowser } from '@/lib/supabase';
 interface WorkspaceProps {
   user: any | null;
   onLogout: () => void;
+  onLogin: () => void;
+  onGoToLanding?: () => void;
   theme?: Theme;
   onThemeChange?: (t: Theme) => void;
 }
@@ -54,6 +56,8 @@ const makeInitialSteps = (): AgentStep[] => [
 export default function Workspace({ 
   user, 
   onLogout,
+  onLogin,
+  onGoToLanding,
   theme = 'dark',
   onThemeChange,
 }: WorkspaceProps) {
@@ -67,6 +71,17 @@ export default function Workspace({
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
   const [profileName, setProfileName] = useState('');
   const [isSavingProfile, setIsSavingProfile] = useState(false);
+
+  // Custom Confirmation Modal State
+  const [confirmModal, setConfirmModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    onConfirm: () => void;
+    confirmText?: string;
+    cancelText?: string;
+    isDangerous?: boolean;
+  } | null>(null);
 
   useEffect(() => {
     if (user) {
@@ -124,6 +139,32 @@ export default function Workspace({
   // ── Database & History Sync ────────────────────────────────────────────────
   const loadHistory = useCallback(async () => {
     if (user?.id) {
+      // Migrate local projects from localStorage to Supabase
+      try {
+        const rawLocal = localStorage.getItem(LS_HISTORY);
+        if (rawLocal) {
+          const localHistory: HistoryItem[] = JSON.parse(rawLocal);
+          if (localHistory.length > 0) {
+            const migrateRes = await fetch('/api/projects', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                userId: user.id,
+                projects: localHistory,
+              }),
+            });
+            if (migrateRes.ok) {
+              localStorage.removeItem(LS_HISTORY);
+              showToast('Proyek lokal Anda telah disinkronkan ke akun Anda! 🎉', 'success');
+            } else {
+              console.error('Failed to migrate local history:', await migrateRes.text());
+            }
+          }
+        }
+      } catch (e) {
+        console.error('Migration error:', e);
+      }
+
       try {
         const response = await fetch(`/api/projects?userId=${user.id}`);
         if (response.ok) {
@@ -151,13 +192,13 @@ export default function Workspace({
       } catch (err) {
         console.error('Failed to load history from DB:', err);
       }
+    } else {
+      try {
+        const raw = localStorage.getItem(LS_HISTORY);
+        if (raw) setHistory(JSON.parse(raw));
+      } catch { /* ignore */ }
     }
-
-    try {
-      const raw = localStorage.getItem(LS_HISTORY);
-      if (raw) setHistory(JSON.parse(raw));
-    } catch { /* ignore */ }
-  }, [user]);
+  }, [user, showToast]);
 
   useEffect(() => {
     loadHistory();
@@ -181,32 +222,50 @@ export default function Workspace({
     });
   }, [user, loadHistory]);
 
-  const deleteHistoryItem = useCallback(async (id: string) => {
-    if (user?.id) {
-      try {
-        const response = await fetch(`/api/projects?projectId=${id}`, {
-          method: 'DELETE',
-        });
-        if (response.ok) {
-          showToast('Project berhasil dihapus.', 'success');
-          loadHistory();
-          if (projectId === id) {
-            resetWorkspace();
+  const deleteHistoryItem = useCallback((id: string) => {
+    setConfirmModal({
+      isOpen: true,
+      title: "Hapus Proyek",
+      message: "Apakah Anda yakin ingin menghapus proyek ini? Seluruh rencana arsitektur dan skema database yang dirancang untuk proyek ini akan dihapus secara permanen.",
+      isDangerous: true,
+      confirmText: "Hapus",
+      cancelText: "Batal",
+      onConfirm: async () => {
+        // Always remove from localStorage to avoid re-migration on refresh
+        try {
+          const raw = localStorage.getItem(LS_HISTORY);
+          if (raw) {
+            const localHistory: HistoryItem[] = JSON.parse(raw);
+            const updatedLocal = localHistory.filter(h => h.id !== id);
+            localStorage.setItem(LS_HISTORY, JSON.stringify(updatedLocal));
           }
-          return;
-        } else {
-          showToast('Gagal menghapus project.', 'error');
+        } catch (e) {
+          console.error('Failed to update localStorage history:', e);
         }
-      } catch (err) {
-        console.error('Failed to delete project:', err);
-        showToast('Gagal menghubungi database.', 'error');
-      }
-    }
 
-    setHistory(prev => {
-      const updated = prev.filter(h => h.id !== id);
-      localStorage.setItem(LS_HISTORY, JSON.stringify(updated));
-      return updated;
+        if (user?.id) {
+          try {
+            const response = await fetch(`/api/projects?projectId=${id}`, {
+              method: 'DELETE',
+            });
+            if (response.ok) {
+              showToast('Project berhasil dihapus.', 'success');
+              loadHistory();
+              if (projectId === id) {
+                resetWorkspace();
+              }
+              return;
+            } else {
+              showToast('Gagal menghapus project.', 'error');
+            }
+          } catch (err) {
+            console.error('Failed to delete project:', err);
+            showToast('Gagal menghubungi database.', 'error');
+          }
+        }
+
+        setHistory(prev => prev.filter(h => h.id !== id));
+      }
     });
   }, [user, projectId, loadHistory, resetWorkspace, showToast]);
 
@@ -556,9 +615,22 @@ export default function Workspace({
           {history.length > 0 && (
             <div className="p-3 border-t flex-shrink-0" style={{ borderColor: 'var(--sidebar-border)' }}>
               <button
-                onClick={() => {
-                  setHistory([]);
-                  localStorage.removeItem(LS_HISTORY);
+                onClick={async () => {
+                  if (confirm("Apakah Anda yakin ingin menghapus seluruh riwayat proyek Anda? Tindakan ini tidak dapat dibatalkan.")) {
+                    if (user?.id) {
+                      try {
+                        for (const item of history) {
+                          await fetch(`/api/projects?projectId=${item.id}`, { method: 'DELETE' });
+                        }
+                        showToast('Seluruh project berhasil dihapus.', 'success');
+                      } catch (err) {
+                        console.error('Failed to clear database projects:', err);
+                      }
+                    }
+                    setHistory([]);
+                    localStorage.removeItem(LS_HISTORY);
+                    resetWorkspace();
+                  }
                 }}
                 className="w-full flex items-center justify-center gap-2 py-2 rounded-lg text-xs transition-all cursor-pointer hover:bg-rose-500/10 hover:text-rose-400"
                 style={{ color: 'var(--text-muted)' }}
@@ -595,9 +667,17 @@ export default function Workspace({
                 </button>
               </div>
             ) : (
-              <div className="flex items-center justify-center gap-2 p-2 rounded-xl bg-blue-500/5 border border-blue-500/10 text-xs select-none" style={{ color: 'var(--text-muted)' }}>
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                Local Work Mode
+              <div className="flex flex-col gap-2">
+                <div className="flex items-center justify-center gap-2 p-2 rounded-xl bg-blue-500/5 border border-blue-500/10 text-xs select-none" style={{ color: 'var(--text-muted)' }}>
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                  Local Work Mode
+                </div>
+                <button
+                  onClick={onLogin}
+                  className="w-full flex items-center justify-center gap-2 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-semibold transition-all cursor-pointer shadow-md hover:scale-[1.02] active:scale-[0.98]"
+                >
+                  Masuk / Login Akun
+                </button>
               </div>
             )}
           </div>
@@ -612,6 +692,7 @@ export default function Workspace({
           onThemeChange={onThemeChange}
           sidebarOpen={sidebarOpen}
           onSidebarToggle={() => setSidebarOpen(v => !v)}
+          onGoToLanding={onGoToLanding}
         />
 
         <main className="flex-grow overflow-y-auto w-full flex justify-center custom-scrollbar relative">
@@ -708,53 +789,73 @@ export default function Workspace({
                     </button>
                   </div>
 
-                  {/* Focus Mode Badge */}
-                  {selectedStepId && (
-                    <div className="flex items-center gap-2 mb-3 px-3 py-2 rounded-xl border border-blue-500/30 bg-blue-500/10">
-                      <Target size={13} className="text-blue-400 flex-shrink-0 animate-pulse" />
-                      <span className="text-xs font-semibold text-blue-300 truncate">
-                        Fokus: {steps.find(s => s.id === selectedStepId)?.name ?? 'Agent'}
-                      </span>
-                      <button
-                        onClick={() => setSelectedStepId(null)}
-                        className="ml-auto flex-shrink-0 text-blue-400 hover:text-blue-200 transition-colors cursor-pointer"
-                        title="Batal fokus"
+                  {user ? (
+                    <>
+                      {/* Focus Mode Badge */}
+                      {selectedStepId && (
+                        <div className="flex items-center gap-2 mb-3 px-3 py-2 rounded-xl border border-blue-500/30 bg-blue-500/10">
+                          <Target size={13} className="text-blue-400 flex-shrink-0 animate-pulse" />
+                          <span className="text-xs font-semibold text-blue-300 truncate">
+                            Fokus: {steps.find(s => s.id === selectedStepId)?.name ?? 'Agent'}
+                          </span>
+                          <button
+                            onClick={() => setSelectedStepId(null)}
+                            className="ml-auto flex-shrink-0 text-blue-400 hover:text-blue-200 transition-colors cursor-pointer"
+                            title="Batal fokus"
+                          >
+                            <X size={12} />
+                          </button>
+                        </div>
+                      )}
+
+                      {/* Textarea for new/update prompt */}
+                      <div
+                        className="rounded-xl overflow-hidden border transition-all focus-within:border-blue-500/50 focus-within:shadow-[0_0_14px_rgba(59,130,246,0.12)]"
+                        style={{ borderColor: 'var(--input-border)', background: 'var(--input-bg)' }}
                       >
-                        <X size={12} />
+                        <textarea
+                          className="w-full min-h-[88px] p-3 bg-transparent resize-none focus:outline-none text-sm leading-relaxed custom-scrollbar placeholder:text-slate-500"
+                          style={{ color: 'var(--input-text)' }}
+                          placeholder={
+                            selectedStepId
+                              ? `Ketik update khusus untuk ${steps.find(s => s.id === selectedStepId)?.name ?? 'agen ini'}...`
+                              : 'Ketik update atau perbaikan untuk plan ini...'
+                          }
+                          value={updatePrompt}
+                          onChange={e => setUpdatePrompt(e.target.value)}
+                          onKeyDown={e => {
+                            if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendUpdate(); }
+                          }}
+                          disabled={isProcessing}
+                        />
+                      </div>
+
+                      <button
+                        onClick={handleSendUpdate}
+                        disabled={!updatePrompt.trim() || isProcessing}
+                        className="mt-3 w-full flex items-center justify-center gap-2 py-2.5 bg-gradient-to-r from-blue-600 to-sky-600 hover:from-blue-500 hover:to-sky-500 text-white rounded-xl text-sm font-semibold transition-all disabled:opacity-40 disabled:cursor-not-allowed shadow-md shadow-blue-950/30 hover:shadow-blue-500/20 active:scale-[0.98] cursor-pointer"
+                      >
+                        <Send size={13} />
+                        {selectedStepId ? 'Kirim Update Terfokus' : 'Kirim Update Plan'}
+                      </button>
+                    </>
+                  ) : (
+                    /* Lock Message for Local Mode */
+                    <div className="mt-2 p-4 rounded-xl border border-amber-500/20 bg-amber-500/5 text-xs text-center flex flex-col items-center gap-2.5 text-theme-muted">
+                      <span className="text-amber-500 font-bold uppercase tracking-wider text-[10px] flex items-center gap-1.5">
+                        <AlertTriangle size={13} className="text-amber-500 animate-pulse" /> Fitur Edit Terkunci
+                      </span>
+                      <p className="leading-relaxed text-[11px]">
+                        Anda menggunakan <strong>Mode Lokal</strong> (Batas: 1x Prompt). Masuk atau buat akun untuk mendapatkan perbaikan tanpa batas, perancangan terfokus, dan generator otomatis lainnya!
+                      </p>
+                      <button
+                        onClick={onLogin}
+                        className="mt-1 w-full py-2 bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold rounded-lg transition-all cursor-pointer shadow hover:scale-[1.02] active:scale-[0.98]"
+                      >
+                        Masuk / Login Sekarang
                       </button>
                     </div>
                   )}
-
-                  {/* Textarea for new/update prompt */}
-                  <div
-                    className="rounded-xl overflow-hidden border transition-all focus-within:border-blue-500/50 focus-within:shadow-[0_0_14px_rgba(59,130,246,0.12)]"
-                    style={{ borderColor: 'var(--input-border)', background: 'var(--input-bg)' }}
-                  >
-                    <textarea
-                      className="w-full min-h-[88px] p-3 bg-transparent resize-none focus:outline-none text-sm leading-relaxed custom-scrollbar placeholder:text-slate-500"
-                      style={{ color: 'var(--input-text)' }}
-                      placeholder={
-                        selectedStepId
-                          ? `Ketik update khusus untuk ${steps.find(s => s.id === selectedStepId)?.name ?? 'agen ini'}...`
-                          : 'Ketik update atau perbaikan untuk plan ini...'
-                      }
-                      value={updatePrompt}
-                      onChange={e => setUpdatePrompt(e.target.value)}
-                      onKeyDown={e => {
-                        if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendUpdate(); }
-                      }}
-                      disabled={isProcessing}
-                    />
-                  </div>
-
-                  <button
-                    onClick={handleSendUpdate}
-                    disabled={!updatePrompt.trim() || isProcessing}
-                    className="mt-3 w-full flex items-center justify-center gap-2 py-2.5 bg-gradient-to-r from-blue-600 to-sky-600 hover:from-blue-500 hover:to-sky-500 text-white rounded-xl text-sm font-semibold transition-all disabled:opacity-40 disabled:cursor-not-allowed shadow-md shadow-blue-950/30 hover:shadow-blue-500/20 active:scale-[0.98] cursor-pointer"
-                  >
-                    <Send size={13} />
-                    {selectedStepId ? 'Kirim Update Terfokus' : 'Kirim Update Plan'}
-                  </button>
                 </div>
 
                 <div className="flex-grow">
@@ -783,6 +884,8 @@ export default function Workspace({
                     boilerplate={finalBoilerplate}
                     projectId={projectId}
                     originalPrompt={prompt || updatePrompt}
+                    isGuest={!user}
+                    onLogin={onLogin}
                   />
                 ) : (
                   <div className="w-full h-full flex flex-col items-center justify-center p-8" style={{ color: 'var(--text-muted)' }}>
@@ -908,6 +1011,59 @@ export default function Workspace({
                 </div>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* ─── Custom Confirm Modal ────────────────────────────────────── */}
+      {confirmModal && confirmModal.isOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fadeIn">
+          <div
+            className="w-full max-w-sm rounded-2xl border p-6 shadow-2xl relative animate-scaleIn text-left"
+            style={{ background: 'var(--panel-active-bg)', borderColor: 'var(--panel-active-border)' }}
+          >
+            <div className="flex items-start gap-4 mb-4">
+              <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${
+                confirmModal.isDangerous 
+                  ? 'bg-rose-500/10 text-rose-400 border border-rose-500/20' 
+                  : 'bg-blue-500/10 text-blue-400 border border-blue-500/20'
+              }`}>
+                <AlertTriangle size={20} />
+              </div>
+              <div className="flex-grow">
+                <h3 className="text-base font-bold" style={{ color: 'var(--text-heading)' }}>
+                  {confirmModal.title}
+                </h3>
+                <p className="text-xs mt-1.5 leading-relaxed" style={{ color: 'var(--text-muted)' }}>
+                  {confirmModal.message}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2.5 pt-3 border-t" style={{ borderColor: 'var(--panel-border)' }}>
+              <button
+                type="button"
+                onClick={() => setConfirmModal(null)}
+                className="px-4 py-2 hover:bg-white/5 rounded-xl text-xs font-semibold transition-colors cursor-pointer"
+                style={{ color: 'var(--text-muted)' }}
+              >
+                {confirmModal.cancelText || 'Batal'}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  confirmModal.onConfirm();
+                  setConfirmModal(null);
+                }}
+                className={`px-4 py-2 text-white rounded-xl text-xs font-bold transition-all hover:scale-[1.01] active:scale-[0.99] cursor-pointer shadow-md ${
+                  confirmModal.isDangerous
+                    ? 'bg-rose-600 hover:bg-rose-500 shadow-rose-950/20'
+                    : 'bg-blue-600 hover:bg-blue-500 shadow-blue-950/20'
+                }`}
+              >
+                {confirmModal.confirmText || 'Ya'}
+              </button>
+            </div>
           </div>
         </div>
       )}

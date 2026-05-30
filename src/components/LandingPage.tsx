@@ -23,6 +23,8 @@ interface LandingPageProps {
   onLocalMode: () => void;
   theme?: Theme;
   onThemeChange?: (t: Theme) => void;
+  user?: any;
+  onGoToWorkspace?: () => void;
 }
 
 const THEME_CYCLE: Theme[] = ['system', 'dark', 'light'];
@@ -37,7 +39,9 @@ export default function LandingPage({
   onGetStarted, 
   onLocalMode,
   theme = 'dark',
-  onThemeChange
+  onThemeChange,
+  user,
+  onGoToWorkspace
 }: LandingPageProps) {
   const [activeStep, setActiveStep] = useState(0);
   const [typedPrompt, setTypedPrompt] = useState('');
@@ -141,7 +145,7 @@ export default function LandingPage({
   const nextTheme = THEME_CYCLE[nextIdx];
 
   return (
-    <div className="min-h-screen w-full bg-theme-bg text-theme-fg font-sans selection:bg-blue-500/30 selection:text-white relative overflow-x-hidden transition-colors duration-300">
+    <div className="min-h-screen w-full bg-theme-bg text-theme-fg font-sans selection:bg-blue-500/30 selection:text-white relative overflow-hidden transition-colors duration-300">
       
       {/* Modern Grid Background Effect */}
       <div className="absolute inset-0 bg-[linear-gradient(to_right,rgba(148,163,184,0.06)_1px,transparent_1px),linear-gradient(to_bottom,rgba(148,163,184,0.06)_1px,transparent_1px)] dark:bg-[linear-gradient(to_right,rgba(255,255,255,0.015)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.015)_1px,transparent_1px)] bg-[size:4rem_4rem] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_0%,#000_70%,transparent_100%)] pointer-events-none" />
@@ -180,18 +184,29 @@ export default function LandingPage({
               </button>
             )}
             
-            <button 
-              onClick={onLocalMode}
-              className="text-xs sm:text-sm font-medium text-theme-muted hover:text-theme-heading px-3 py-1.5 sm:px-4 sm:py-2 rounded-xl transition-all cursor-pointer hover:bg-theme-panel-active"
-            >
-              Mode Lokal
-            </button>
-            <button 
-              onClick={onGetStarted}
-              className="text-xs sm:text-sm font-bold bg-blue-600 hover:bg-blue-500 text-white px-4 py-1.5 sm:px-5 sm:py-2 rounded-xl transition-all shadow-[0_4px_15px_rgba(59,130,246,0.35)] hover:shadow-[0_4px_20px_rgba(59,130,246,0.5)] cursor-pointer hover:scale-[1.02] active:scale-[0.98]"
-            >
-              Masuk / Daftar
-            </button>
+            {user ? (
+              <button 
+                onClick={onGoToWorkspace}
+                className="text-xs sm:text-sm font-bold bg-blue-600 hover:bg-blue-500 text-white px-4 py-1.5 sm:px-5 sm:py-2 rounded-xl transition-all shadow-[0_4px_15px_rgba(59,130,246,0.35)] hover:shadow-[0_4px_20px_rgba(59,130,246,0.5)] cursor-pointer hover:scale-[1.02] active:scale-[0.98]"
+              >
+                Buka Workspace
+              </button>
+            ) : (
+              <>
+                <button 
+                  onClick={onLocalMode}
+                  className="text-xs sm:text-sm font-medium text-theme-muted hover:text-theme-heading px-3 py-1.5 sm:px-4 sm:py-2 rounded-xl transition-all cursor-pointer hover:bg-theme-panel-active"
+                >
+                  Mode Lokal
+                </button>
+                <button 
+                  onClick={onGetStarted}
+                  className="text-xs sm:text-sm font-bold bg-blue-600 hover:bg-blue-500 text-white px-4 py-1.5 sm:px-5 sm:py-2 rounded-xl transition-all shadow-[0_4px_15px_rgba(59,130,246,0.35)] hover:shadow-[0_4px_20px_rgba(59,130,246,0.5)] cursor-pointer hover:scale-[1.02] active:scale-[0.98]"
+                >
+                  Masuk / Daftar
+                </button>
+              </>
+            )}
           </div>
         </div>
       </nav>
@@ -458,6 +473,72 @@ create table public.products (
         </div>
       </section>
 
+      {/* ─── PLUTO SYSTEM & ARCHITECTURE EXPLANATION ──────────────── */}
+      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20 relative z-10 border-t border-theme-panel-border bg-gradient-to-b from-transparent via-sky-500/5 to-transparent">
+        <div className="text-center mb-16">
+          <h2 className="text-xs font-bold uppercase tracking-widest text-sky-500 dark:text-sky-400 mb-2">Teknologi & Arsitektur</h2>
+          <h3 className="text-3xl sm:text-4xl font-bold text-theme-heading tracking-tight">Di Balik Layar Pluto Engine</h3>
+          <p className="text-theme-muted text-sm sm:text-base max-w-xl mx-auto mt-3">
+            Pluto dirancang menggunakan paradigma AI mutakhir yang menggabungkan kolaborasi multi-agent sekuensial dan model penalaran berkinerja tinggi.
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+          
+          {/* Card 1: Google Gemini API */}
+          <div className="p-6 rounded-3xl border border-theme-panel-border bg-theme-panel backdrop-blur-xl hover:border-blue-500/30 transition-all duration-300 flex flex-col justify-between hover:scale-[1.01]">
+            <div>
+              <div className="w-12 h-12 rounded-2xl bg-blue-500/10 border border-blue-500/20 text-blue-500 flex items-center justify-center mb-6">
+                <Cpu size={24} />
+              </div>
+              <h4 className="text-base font-bold text-theme-heading mb-3">Google Gemini 3.5 Flash</h4>
+              <p className="text-xs sm:text-sm text-theme-muted leading-relaxed">
+                Pluto Engine ditenagai oleh model mutakhir <strong>Gemini 3.5 Flash</strong> dari Google DeepMind. Model ini dipilih karena kemampuannya dalam memahami konteks instruksi yang sangat panjang, memformulasikan kode teknis terstruktur (SQL & Shell), serta memproses respons berkecepatan tinggi secara real-time.
+              </p>
+            </div>
+            <div className="mt-6 pt-4 border-t border-theme-panel-border text-[10px] text-theme-muted font-mono flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-blue-500" />
+              Gemini LLM Integration
+            </div>
+          </div>
+
+          {/* Card 2: Sequential Multi-Agent */}
+          <div className="p-6 rounded-3xl border border-theme-panel-border bg-theme-panel backdrop-blur-xl hover:border-blue-500/30 transition-all duration-300 flex flex-col justify-between hover:scale-[1.01]">
+            <div>
+              <div className="w-12 h-12 rounded-2xl bg-sky-500/10 border border-sky-500/20 text-sky-500 flex items-center justify-center mb-6">
+                <Layers size={24} />
+              </div>
+              <h4 className="text-base font-bold text-theme-heading mb-3">Sequential Multi-Agent Collaboration</h4>
+              <p className="text-xs sm:text-sm text-theme-muted leading-relaxed">
+                Alih-alih mengandalkan satu asisten umum, Pluto mendelegasikan tugas ke <strong>empat agen AI spesialis</strong> (Analyst, Frontend, Backend, QA) yang berjalan secara berurutan. Setiap agen bertindak sebagai filter kualitas, memeriksa output agen sebelumnya, dan menambahkan spesifikasinya untuk melahirkan dokumen blueprint yang komprehensif.
+              </p>
+            </div>
+            <div className="mt-6 pt-4 border-t border-theme-panel-border text-[10px] text-theme-muted font-mono flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-sky-500" />
+              Stateful Multi-Agent Flow
+            </div>
+          </div>
+
+          {/* Card 3: Stateless & Token-Saving Architecture */}
+          <div className="p-6 rounded-3xl border border-theme-panel-border bg-theme-panel backdrop-blur-xl hover:border-blue-500/30 transition-all duration-300 flex flex-col justify-between hover:scale-[1.01]">
+            <div>
+              <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-500 flex items-center justify-center mb-6">
+                <Zap size={24} />
+              </div>
+              <h4 className="text-base font-bold text-theme-heading mb-3">Stateless & Token-Saving Design</h4>
+              <p className="text-xs sm:text-sm text-theme-muted leading-relaxed">
+                Dioptimalkan untuk performa maksimal dengan latensi rendah. Pluto menggunakan <strong>penyimpanan context state terkompresi</strong> yang dialirkan ke agen berikutnya. Arsitektur cerdas ini memotong konsumsi token Gemini hingga <strong>60%</strong> lebih hemat dibandingkan sistem chat tunggal konvensional, tanpa mengurangi kualitas rencana pengembangan yang dihasilkan.
+              </p>
+            </div>
+            <div className="mt-6 pt-4 border-t border-theme-panel-border text-[10px] text-theme-muted font-mono flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-emerald-500" />
+              Optimized API Usage
+            </div>
+          </div>
+
+        </div>
+      </section>
+
       {/* ─── FAQ SECTION ─────────────────────────────────────────── */}
       <section id="faq" className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-24 relative z-10 border-t border-theme-panel-border">
         
@@ -531,11 +612,6 @@ create table public.products (
           </div>
 
           <p>© {new Date().getFullYear()} Pluto Engine. Hak Cipta Dilindungi.</p>
-
-          <div className="flex gap-4">
-            <a href="#" className="hover:text-theme-heading transition-colors">Privacy Policy</a>
-            <a href="#" className="hover:text-theme-heading transition-colors">Terms of Service</a>
-          </div>
         </div>
       </footer>
 

@@ -11,6 +11,7 @@ interface HeaderProps {
   onThemeChange?: (t: Theme) => void;
   sidebarOpen?: boolean;
   onSidebarToggle?: () => void;
+  onGoToLanding?: () => void;
 }
 
 const THEME_CYCLE: Theme[] = ['system', 'dark', 'light'];
@@ -27,6 +28,7 @@ export default function Header({
   onThemeChange,
   sidebarOpen,
   onSidebarToggle,
+  onGoToLanding,
 }: HeaderProps) {
   const meta = THEME_META[theme];
   const nextIdx = (THEME_CYCLE.indexOf(theme) + 1) % THEME_CYCLE.length;
@@ -49,8 +51,10 @@ export default function Header({
             {sidebarOpen ? <PanelLeftClose size={18} /> : <PanelLeftOpen size={18} />}
           </button>
         )}
-        <div
-          className="flex items-center gap-2 px-3 py-1.5 border rounded-lg text-sm font-semibold select-none"
+        <button
+          onClick={onGoToLanding}
+          title="Kembali ke Beranda"
+          className="flex items-center gap-2 px-3 py-1.5 border rounded-lg text-sm font-semibold cursor-pointer hover:bg-white/5 transition-all"
           style={{
             borderColor: 'var(--panel-border)',
             background: 'var(--panel-bg)',
@@ -66,7 +70,7 @@ export default function Header({
           </div>
           <span className="hidden sm:inline">Pluto Engine</span>
           <span className="sm:hidden">Pluto</span>
-        </div>
+        </button>
       </div>
 
       {/* Right: theme toggle + new plan + logout */}

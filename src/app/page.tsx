@@ -83,11 +83,19 @@ export default function Home() {
   }
 
   // If logged in or guest mode is active, always go to workspace
-  if (user || isLocalMode || view === 'workspace') {
+  if (view === 'workspace' || (isLocalMode && view !== 'landing' && view !== 'auth')) {
     return (
       <Workspace 
         user={user} 
         onLogout={handleLogout} 
+        onLogin={() => {
+          setIsLocalMode(false);
+          setView('auth');
+        }}
+        onGoToLanding={() => {
+          setIsLocalMode(false);
+          setView('landing');
+        }}
         theme={theme}
         onThemeChange={setTheme}
       />
@@ -114,7 +122,15 @@ export default function Home() {
   // Default is Landing Page
   return (
     <LandingPage
-      onGetStarted={() => setView('auth')}
+      user={user}
+      onGoToWorkspace={() => setView('workspace')}
+      onGetStarted={() => {
+        if (user) {
+          setView('workspace');
+        } else {
+          setView('auth');
+        }
+      }}
       onLocalMode={() => {
         setIsLocalMode(true);
         setView('workspace');
